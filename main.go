@@ -49,7 +49,7 @@ func main() {
 		g2.NewReceiver(r.Name, r.CalBalance())
 	}
 	// g2 still have no edges
-	g2.Optimize()
+	g2.Optimize(true, true)
 	g2.Print()
 
 	g3 := debt.NewTwoSidesGraph()
@@ -68,7 +68,7 @@ func main() {
 	g3.NewGiver("L", -4)
 	g3.NewGiver("M", -1)
 	g3.NewGiver("N", -9)
-	g3.Optimize()
+	g3.Optimize(true, true)
 	g3.Print()
 	fmt.Println("Number of non-zero edges:", g3.NumofNonZeroEdges())
 }

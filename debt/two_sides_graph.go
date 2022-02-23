@@ -130,7 +130,7 @@ func (g TwoSidesGraph) NumofNonZeroEdges() uint64 {
 
 // Optimized for the case when there are no edges.
 // Main logic for this demo.
-func (g *TwoSidesGraph) Optimize() {
+func (g *TwoSidesGraph) Optimize(pairing, SLRTR bool) {
 	if !g.IsBalance() {
 		panic("graph is not balanced")
 	}
@@ -138,29 +138,39 @@ func (g *TwoSidesGraph) Optimize() {
 		panic("graph has edges already")
 	}
 
-	receiversBalanceMap := g.calReceiversBalanceMap()
-	giversBalanceMap := g.calGiversBalanceMap()
+	var (
+		receivers, givers []*Vertex
+	)
 
-	// After this step, we don't have any same balance (sum = 0) r-g pair.
-	g.createSameBalRGPairs(receiversBalanceMap, giversBalanceMap)
+	if pairing {
+		receiversBalanceMap := g.calReceiversBalanceMap()
+		giversBalanceMap := g.calGiversBalanceMap()
+		// After this step, we don't have any same balance (sum = 0) r-g pair.
+		g.createSameBalRGPairs(receiversBalanceMap, giversBalanceMap)
+		receivers = g.sortedSameBalancer(receiversBalanceMap, true)
+		givers = g.sortedSameBalancer(giversBalanceMap, false)
+	} else {
+		receivers = g.sortedReceivers()
+		givers = g.sortedGivers()
+	}
 
-	// Create edges for the non-same balance r-g pairs.
-	receivers := g.sortedSameBalancer(receiversBalanceMap, true)
-	givers := g.sortedSameBalancer(giversBalanceMap, false)
 	rCount := 0
 
 	// First round, create edges for the receivers if posible.
-	for gCount := 0; rCount < len(receivers) && gCount < len(givers); {
-		receiver := receivers[rCount]
-		giver := givers[gCount]
-		if receiver.Balance < -giver.Balance {
-			g.NewEdge(giver, receiver, receiver.Balance)
-			rCount++
-			// giver is already used, skip to the next giver because
-			// smallest-LEAST-recently-transfer-giver rule.
-			gCount++
-		} else {
-			gCount++
+	// This step covers the smallest-LEAST-recently-transfer rule.
+	if SLRTR {
+		for gCount := 0; rCount < len(receivers) && gCount < len(givers); {
+			receiver := receivers[rCount]
+			giver := givers[gCount]
+			if receiver.Balance < -giver.Balance {
+				g.NewEdge(giver, receiver, receiver.Balance)
+				rCount++
+				// giver is already used, skip to the next giver because
+				// smallest-LEAST-recently-transfer-giver rule.
+				gCount++
+			} else {
+				gCount++
+			}
 		}
 	}
 
@@ -221,17 +231,17 @@ func (g *TwoSidesGraph) createSameBalRGPairs(receiversBalanceMap, giversBalanceM
 }
 
 func (g *TwoSidesGraph) sortedSameBalancer(balanceMap map[int64][]*Vertex, asc bool) []*Vertex {
-	receivers := make([]*Vertex, 0)
+	balancers := make([]*Vertex, 0)
 	for _, sameBals := range balanceMap {
-		receivers = append(receivers, sameBals...)
+		balancers = append(balancers, sameBals...)
 	}
-	sort.SliceStable(receivers, func(i, j int) bool {
+	sort.SliceStable(balancers, func(i, j int) bool {
 		if asc {
-			return receivers[i].Balance < receivers[j].Balance
+			return balancers[i].Balance < balancers[j].Balance
 		}
-		return receivers[i].Balance > receivers[j].Balance
+		return balancers[i].Balance > balancers[j].Balance
 	})
-	return receivers
+	return balancers
 }
 
 func (g *TwoSidesGraph) calReceiversBalanceMap() map[int64][]*Vertex {
@@ -248,4 +258,26 @@ func (g *TwoSidesGraph) calGiversBalanceMap() map[int64][]*Vertex {
 		m[r.Balance] = append(m[r.Balance], r)
 	}
 	return m
+}
+
+func (g *TwoSidesGraph) sortedReceivers() []*Vertex {
+	receivers := make([]*Vertex, 0, len(g.Receivers))
+	for _, r := range g.Receivers {
+		receivers = append(receivers, r)
+	}
+	sort.SliceStable(receivers, func(i, j int) bool {
+		return receivers[i].Balance < receivers[j].Balance
+	})
+	return receivers
+}
+
+func (g *TwoSidesGraph) sortedGivers() []*Vertex {
+	givers := make([]*Vertex, 0, len(g.Givers))
+	for _, g := range g.Givers {
+		givers = append(givers, g)
+	}
+	sort.SliceStable(givers, func(i, j int) bool {
+		return givers[i].Balance > givers[j].Balance
+	})
+	return givers
 }
