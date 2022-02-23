@@ -20,6 +20,9 @@ func NewTwoSidesGraph() *TwoSidesGraph {
 }
 
 func (g *TwoSidesGraph) NewReceiver(name string, balance int64) *Vertex {
+	if balance <= 0 {
+		panic("balance must be positive")
+	}
 	v := &Vertex{
 		Name:         name,
 		Balance:      balance,
@@ -31,6 +34,9 @@ func (g *TwoSidesGraph) NewReceiver(name string, balance int64) *Vertex {
 }
 
 func (g *TwoSidesGraph) NewGiver(name string, balance int64) *Vertex {
+	if balance >= 0 {
+		panic("balance must be negative")
+	}
 	v := &Vertex{
 		Name:         name,
 		Balance:      balance,
@@ -86,7 +92,7 @@ func (g TwoSidesGraph) Print() {
 }
 
 // IsBalance if the sum of receivers' balances and givers' balances is equal to 0.
-func (g *TwoSidesGraph) IsBalance() bool {
+func (g TwoSidesGraph) IsBalance() bool {
 	var sum int64
 	for _, r := range g.Receivers {
 		sum += r.CalBalance()
@@ -95,6 +101,21 @@ func (g *TwoSidesGraph) IsBalance() bool {
 		sum += g.CalBalance()
 	}
 	return sum == 0
+}
+
+// IsOptimized if there are no vertices with non-zero Balance
+func (g TwoSidesGraph) IsOptimized() bool {
+	for _, r := range g.Receivers {
+		if r.Balance != 0 {
+			return false
+		}
+	}
+	for _, g := range g.Givers {
+		if g.Balance != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (g TwoSidesGraph) NumofNonZeroEdges() uint64 {
@@ -125,9 +146,7 @@ func (g *TwoSidesGraph) Optimize() {
 
 	// Create edges for the non-same balance r-g pairs.
 	receivers := g.sortedSameBalancer(receiversBalanceMap, true)
-	fmt.Println("receivers: ", receivers, len(receivers))
 	givers := g.sortedSameBalancer(giversBalanceMap, false)
-	fmt.Println("givers: ", givers, len(givers))
 	rCount := 0
 
 	// First round, create edges for the receivers if posible.
@@ -146,12 +165,21 @@ func (g *TwoSidesGraph) Optimize() {
 	}
 
 	// Second round, create edges for all non-zero givers remainning.
-	for gCount := 0; rCount < len(receivers) && gCount < len(givers); gCount++ {
+	for gCount := 0; rCount < len(receivers) && gCount < len(givers); {
 		giver := givers[gCount]
 		receiver := receivers[rCount]
-		if giver.Balance != 0 {
-			g.NewEdge(giver, receiver, giver.Balance)
+		// run until the giver's balance is zero.
+		if giver.Balance == 0 {
+			gCount++
+			continue
 		}
+		if receiver.Balance < -giver.Balance {
+			g.NewEdge(giver, receiver, receiver.Balance)
+			rCount++
+			continue
+		}
+		g.NewEdge(giver, receiver, -giver.Balance)
+		gCount++
 		if receiver.Balance == 0 {
 			rCount++
 		}

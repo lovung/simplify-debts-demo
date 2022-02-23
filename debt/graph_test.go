@@ -43,7 +43,7 @@ func TestGraph(t *testing.T) {
 	// g2 still have no edges
 	g2.Optimize()
 	g2.Print()
-	if g2.NumofNonZeroEdges() != 4 {
+	if g2.NumofNonZeroEdges() != 3 {
 		t.Errorf("g2 should have 3 edge, but got %d", g2.NumofNonZeroEdges())
 	}
 }
